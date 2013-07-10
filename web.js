@@ -5,14 +5,7 @@ var app = express.createServer(express.logger());
 
 app.get('/', function(request, response) {
   var myBuffer;
-
-  fs.readFileSync('index.html', function (err, data) {
-    if (err) {
-       myBuffer = new Buffer("Error reading from file...");
-    }
-    myBuffer = new Buffer(data);
-  }
-
+  myBuffer = new Buffer(fs.readFileSync('index.html'));
   response.send(myBuffer.toString());
 });
 
