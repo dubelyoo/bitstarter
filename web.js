@@ -12,7 +12,7 @@ app.get('/', function(request, response) {
     myBuffer = new Buffer(data);
   }
 
-  response.write(myBuffer.toString();
+  response.send(myBuffer.toString();
 });
 
 var port = process.env.PORT || 5000;
