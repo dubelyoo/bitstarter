@@ -21,9 +21,11 @@ References:
    - https://developer.mozilla.org/en-US/docs/JSON#JSON_in_Firefox_2
 */
 
+var util = require('util');
 var fs = require('fs');
 var program = require('commander');
 var cheerio = require('cheerio');
+var rest = require('restler');
 var HTMLFILE_DEFAULT = "index.html";
 var CHECKSFILE_DEFAULT = "checks.json";
 
@@ -61,14 +63,62 @@ var clone = function(fn) {
     return fn.bind({});
 };
 
+
+var checkUrl = function(url, checksfile) {
+   rest.get(url).once('complete', 
+      function(data, response) {
+         var ret = {};
+         $ = cheerio.load(data);
+         var checks = loadChecks(checksfile).sort();
+         for(var ii in checks) {
+             var present = $(checks[ii]).length > 0;
+             ret[checks[ii]] = present;
+         }
+
+         var outJson = JSON.stringify(ret, null, 4);
+         console.log(outJson);
+      });
+}
+ 
+var assertUrlOk = function(url) {
+   rest.get(url).once('complete', 
+     function(data, response) {
+        if (data instanceof Error) {
+           console.error('Error: ' + data.message);
+           process.exit(2);
+        }
+
+        if (response.statusCode >= 400 && 
+            response.statusCode <= 599) {
+           console.error('Error: HTTP Status Code ' + response.statusCode);
+           process.exit(3); 
+        }
+     });
+   return url;
+}
+
 if(require.main == module) {
     program
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
-        .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
+        .option('--url <url>', 'URL to file to check', assertUrlOk)
+        .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists))
         .parse(process.argv);
-    var checkJson = checkHtmlFile(program.file, program.checks);
-    var outJson = JSON.stringify(checkJson, null, 4);
-    console.log(outJson);
+
+    var fileProvided = program.f || program.file;
+    var urlProvided = program.url;
+
+    if (fileProvided && urlProvided) {
+       console.error('Only one of --file or --url can be used');   
+    } else if (fileProvided) {
+       var checkJson = checkHtmlFile(program.file, program.checks);
+       var outJson = JSON.stringify(checkJson, null, 4);
+       console.log(outJson);
+    } else if (urlProvided) {
+       checkUrl(program.url, program.checks);
+    } else {
+       console.error('Missing required parameters. Use --file or --url');
+    }
+ 
 } else {
     exports.checkHtmlFile = checkHtmlFile;
 }
